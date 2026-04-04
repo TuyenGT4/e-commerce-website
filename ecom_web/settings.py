@@ -11,19 +11,24 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import environ
+import os
+
+env = environ.Env(DEBUG = (bool, False))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+# read .env file before use env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-7@fw9bhmmr0%!ich(s-e$n%6aql=dnr^6xbq#cele=$!dxc_&4'
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = []
 
@@ -31,6 +36,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -38,14 +44,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
-    'userauths',
-    'store',
-    'vendor',
-    'customer',
-    'blog',
-    
     'anymail',
-    'captcha'
+    # 'captcha'
+    
+    'userauths.apps.UserauthsConfig',
+    'store.apps.StoreConfig',
+    'vendor.apps.VendorConfig',
+    'customer.apps.CustomerConfig',
+    'blog.apps.BlogConfig',
 ]
 
 MIDDLEWARE = [
@@ -63,7 +69,7 @@ ROOT_URLCONF = 'ecom_web.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -83,10 +89,7 @@ WSGI_APPLICATION = 'ecom_web.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db()
 }
 
 
@@ -125,8 +128,238 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = 'userauths.User'
+
+# Custom Admin Settings - Jazzmin
+JAZZMIN_SETTINGS = {
+    "site_title": "Quản Trị Cửa Hàng",
+    "site_header": "Hệ Thống Quản Trị",
+    "site_brand": "FastCart Việt Nam",
+    "welcome_sign": "Chào mừng đến trang quản trị",
+    "copyright": "FastCart Việt Nam",
+    "user_avatar": "images/photos/logo.jpg",
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "order_with_respect_to": [
+        "store",
+        "store.product",
+        "store.cartorder",
+        "store.cartorderitem",
+        "store.cart",
+        "store.category",
+        "store.brand",
+        "store.productfaq",
+        "store.review",
+        "vendor.Coupon",
+        "vendor.DeliveryCouriers",
+        "userauths",
+        "userauths.user",
+        "userauths.profile",
+        "donations",
+        "blog",
+        'newsfeed',
+        "contacts",
+        "addon",
+    ],
+    "icons": {
+        "admin.LogEntry": "fas fa-file",
+
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+
+        "userauths.User": "fas fa-user",
+        "userauths.Profile": "fas fa-address-card",
+
+        "donations.Donation": "fas fa-hand-holding-usd",
+        "donations.Payment": "fas fa-credit-card",
+
+        "newsfeed.Newsletter": "fas fa-envelope",
+        "newsfeed.SubscribedUser": "fas fa-at",
+
+        "contacts.Inquiry": "fas fa-phone",
+        "addon.BasicAddon": "fas fa-cog",
+
+        "store.Product": "fas fa-th",
+        "store.CartOrder": "fas fa-shopping-cart",
+        "store.Cart": "fas fa-cart-plus",
+        "store.CartOrderItem": "fas fa-shopping-basket",
+        "store.Brand": "fas fa-check-circle",
+        "store.productfaq": "fas fa-question",
+        "store.Review": "fas fa-star fa-beat",
+        "store.Category": "fas fa-tag",
+        "store.Tag": "fas fa-tag",
+        "store.Notification": "fas fa-bell",
+
+        "customer.Address": "fas fa-location-arrow",
+        "customer.Wishlist": "fas fa-heart",
+
+        "vendor.DeliveryCouriers": "fas fa-truck",
+        "vendor.Coupon": "fas fa-percentage",
+        "vendor.Vendor": "fas fa-store",
+        "vendor.Notification": "fas fa-bell",
+        "vendor.PayoutTracker": "fas fa-wallet",
+        "vendor.ChatMessage": "fas fa-envelope",
+
+        "addons.BecomeAVendor": "fas fa-user-plus",
+        "addons.AboutUS": "fas fa-users",
+        "addons.Company": "fas fa-university",
+        "addons.BasicAddon": "fas fa-cog",
+    },
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-arrow-circle-right",
+    "related_modal_active": False,
+
+    "custom_js": None,
+    "show_ui_builder": False,  # Tắt ở production
+
+    "changeform_format": "horizontal_tabs",
+    "changeform_format_overrides": {
+        "auth.user": "collapsible",
+        "auth.group": "vertical_tabs",
+    },
+
+    # Đổi tên menu sidebar sang tiếng Việt
+    "custom_links": {},
+    "show_ui_builder": False,
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-success",   # Màu xanh lá - có thể đổi tuỳ ý
+    "accent": "accent-teal",
+    "navbar": "navbar-dark",
+    "no_navbar_border": True,
+    "navbar_fixed": True,               # Giữ navbar cố định khi scroll
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-dark-success",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": True,  # Gọn hơn
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": False,
+    "theme": "default",
+    "dark_mode_theme": None,
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success",
+    }
+}
+
+
+customColorPalette = [
+    {"color": "hsl(4, 90%, 58%)", "label": "Đỏ"},
+    {"color": "hsl(340, 82%, 52%)", "label": "Hồng"},
+    {"color": "hsl(291, 64%, 42%)", "label": "Tím"},
+    {"color": "hsl(262, 52%, 47%)", "label": "Tím đậm"},
+    {"color": "hsl(231, 48%, 48%)", "label": "Chàm"},
+    {"color": "hsl(207, 90%, 54%)", "label": "Xanh dương"},
+]
+
+CKEDITOR_5_CONFIGS = {
+    "default": {
+        "toolbar": [
+            "heading", "|",
+            "bold", "italic", "link",
+            "bulletedList", "numberedList",
+            "blockQuote", "imageUpload"
+        ],
+    },
+    "comment": {
+        "language": {"ui": "vi", "content": "vi"},  # Việt hóa CKEditor
+        "toolbar": [
+            "heading", "|",
+            "bold", "italic", "link",
+            "bulletedList", "numberedList",
+            "blockQuote",
+        ],
+    },
+    "extends": {
+        "language": "vi",                           # Việt hóa CKEditor
+        "blockToolbar": [
+            "paragraph",
+            "heading1", "heading2", "heading3",
+            "|",
+            "bulletedList", "numberedList",
+            "|",
+            "blockQuote",
+        ],
+        "toolbar": [
+            "bold", "italic", "underline", "|",
+            "link", "strikethrough", "code",
+            "subscript", "superscript", "highlight", "|",
+            "bulletedList", "numberedList", "todoList", "|",
+            "blockQuote", "insertImage", "|",
+            "fontSize", "fontFamily", "fontColor",
+            "fontBackgroundColor", "mediaEmbed",
+            "removeFormat", "insertTable", "sourceEditing",
+        ],
+        "image": {
+            "toolbar": [
+                "imageTextAlternative", "|",
+                "imageStyle:alignLeft",
+                "imageStyle:alignRight",
+                "imageStyle:alignCenter",
+                "imageStyle:side", "|",
+                "toggleImageCaption", "|"
+            ],
+            "styles": ["full", "side", "alignLeft", "alignRight", "alignCenter"],
+        },
+        "table": {
+            "contentToolbar": [
+                "tableColumn", "tableRow",
+                "mergeTableCells",
+                "tableProperties",
+                "tableCellProperties",
+            ],
+            "tableProperties": {
+                "borderColors": customColorPalette,
+                "backgroundColors": customColorPalette,
+            },
+            "tableCellProperties": {
+                "borderColors": customColorPalette,
+                "backgroundColors": customColorPalette,
+            },
+        },
+        "heading": {
+            "options": [
+                {"model": "paragraph", "title": "Đoạn văn", "class": "ck-heading_paragraph"},
+                {"model": "heading1", "view": "h1", "title": "Tiêu đề 1", "class": "ck-heading_heading1"},
+                {"model": "heading2", "view": "h2", "title": "Tiêu đề 2", "class": "ck-heading_heading2"},
+                {"model": "heading3", "view": "h3", "title": "Tiêu đề 3", "class": "ck-heading_heading3"},
+            ]
+        },
+        "list": {
+            "properties": {
+                "styles": True,
+                "startIndex": True,
+                "reversed": True,
+            }
+        },
+        "htmlSupport": {
+            "allow": [
+                {"name": "/.*/", "attributes": True, "classes": True, "styles": True}
+            ]
+        },
+    },
+}
