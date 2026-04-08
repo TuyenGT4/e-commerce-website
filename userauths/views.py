@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login
+from django.contrib.auth import logout
 
 from userauths import models as userauths_models
 from userauths import forms as userauths_forms
@@ -9,7 +10,7 @@ from vendor import models as vendor_models
 
 def register_view(request):
     if request.user.is_authenticated:
-        messages.warning(request, "Bạn đã đăng nhập rồi.")
+        messages.warning(request, "Bạn đã đăng nhập rồi")
         return redirect('/')
 
     form = userauths_forms.UserRegisterForm(request.POST or None)
@@ -24,20 +25,14 @@ def register_view(request):
         user_type = form.cleaned_data.get("user_type")
 
         user = authenticate(email=email, password=password)
-
-        if user is None:
-            messages.error(request, "Có lỗi xảy ra khi xác thực tài khoản. Vui lòng thử lại.")
-            return redirect('userauths:sign-up')
-
         login(request, user)
-        messages.success(request, "Tạo tài khoản thành công. Chào mừng bạn!")
 
+        messages.success(request, "Tạo tài khoản thành công. Chào mừng bạn!")
         profile = userauths_models.Profile.objects.create(
-            full_name=full_name,
-            mobile=mobile,
+            full_name=full_name, 
+            mobile=mobile, 
             user=user
         )
-
         if user_type == "Vendor":
             vendor_models.Vendor.objects.create(user=user, store_name=full_name)
             profile.user_type = "Vendor"
@@ -57,7 +52,7 @@ def register_view(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        messages.warning(request, "Bạn đã đăng nhập rồi.")
+        messages.warning(request, "Bạn đã đăng nhập rồi")
         return redirect('store:index')
 
     if request.method == 'POST':
@@ -67,30 +62,43 @@ def login_view(request):
             password = form.cleaned_data['password']
             captcha_verified = form.cleaned_data.get('captcha', False)
 
-            if not captcha_verified:
-                messages.error(request, "Xác minh captcha thất bại. Vui lòng thử lại.")
-            else:
+            if captcha_verified:
                 try:
-                    # Kiểm tra tài khoản có tồn tại và đang hoạt động không
-                    userauths_models.User.objects.get(email=email, is_active=True)
-                    user = authenticate(request, email=email, password=password)
+                    user_instance = userauths_models.User.objects.get(
+                        email=email, 
+                        is_active=True
+                    )
+                    user_authenticate = authenticate(
+                        request, 
+                        email=email, 
+                        password=password
+                    )
 
-                    if user is not None:
-                        login(request, user)
-                        messages.success(request, f"Chào mừng trở lại, {user.profile.full_name or user.email}!")
+                    if user_instance is not None:
+                        login(request, user_authenticate)
+                        messages.success(request, "Đăng nhập thành công. Chào mừng trở lại!")
+                        next_url = request.GET.get("next", 'store:index')
 
-                        next_url = request.GET.get("next", "")
+                        print("next_url ========", next_url)
+                        if next_url == '//':
+                            return redirect('store:index')
 
-                        # Lọc các giá trị next_url không hợp lệ
-                        if not next_url or not next_url.startswith('/') or next_url == '/undefined/':
+                        if next_url == 'undefined':
+                            return redirect('store:index')
+
+                        if next_url is None or not next_url.startswith('/'):
                             return redirect('store:index')
 
                         return redirect(next_url)
+
                     else:
-                        messages.error(request, "Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.")
+                        messages.error(request, "Email hoặc mật khẩu không chính xác")
 
                 except userauths_models.User.DoesNotExist:
-                    messages.error(request, "Tài khoản với email này không tồn tại.")
+                    messages.error(request, "Tài khoản không tồn tại")
+            else:
+                messages.error(request, "Xác minh Captcha thất bại. Vui lòng thử lại")
+
     else:
         form = userauths_forms.LoginForm()
 
@@ -98,25 +106,25 @@ def login_view(request):
 
 
 def logout_view(request):
-    # Giữ lại cart_id trong session sau khi đăng xuất
-    cart_id = request.session.get('cart_id')
-
+    if "cart_id" in request.session:
+        cart_id = request.session['cart_id']
+    else:
+        cart_id = None
     logout(request)
-
-    if cart_id:
-        request.session['cart_id'] = cart_id
-
-    messages.success(request, "Bạn đã đăng xuất thành công.")
+    request.session['cart_id'] = cart_id
+    messages.success(request, "Bạn đã đăng xuất thành công")
     return redirect("userauths:sign-in")
 
 
 def handler404(request, exception, *args, **kwargs):
-    response = render(request, 'userauths/404.html', {})
+    context = {}
+    response = render(request, 'userauths/404.html', context)
     response.status_code = 404
     return response
 
 
 def handler500(request, *args, **kwargs):
-    response = render(request, 'userauths/500.html', {})
+    context = {}
+    response = render(request, 'userauths/500.html', context)
     response.status_code = 500
     return response

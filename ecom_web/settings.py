@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import environ
 import os
+from django.contrib import messages
 
 env = environ.Env(DEBUG = (bool, False))
 
@@ -43,9 +44,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     
     'anymail',
-    # 'captcha'
+    # 'captcha',
+    'django.forms',
+    'django_ckeditor_5',
     
     'userauths.apps.UserauthsConfig',
     'store.apps.StoreConfig',
@@ -115,9 +119,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'vi'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Ho_Chi_Minh'
 
 USE_I18N = True
 
@@ -136,8 +140,48 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
+
+# VNPay Configuration
+VNPAY_TMN_CODE = env("VNPAY_TMN_CODE")          # Mã website tại VNPay
+VNPAY_HASH_SECRET = env("VNPAY_HASH_SECRET")    # Chuỗi bí mật để tạo chữ ký
+VNPAY_PAYMENT_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+VNPAY_RETURN_URL = env("VNPAY_RETURN_URL")      # URL callback sau thanh toán
+
+# VietQR Configuration (QR Code ngân hàng)
+VIETQR_BANK_ID = env("VIETQR_BANK_ID")          # Mã ngân hàng (vd: "VCB", "TCB")
+VIETQR_ACCOUNT_NO = env("VIETQR_ACCOUNT_NO")    # Số tài khoản
+VIETQR_ACCOUNT_NAME = env("VIETQR_ACCOUNT_NAME") # Tên chủ tài khoản
+
+
+
+FROM_EMAIL=env("FROM_EMAIL")
+EMAIL_BACKEND=env("EMAIL_BACKEND")
+DEFAULT_FROM_EMAIL=env("DEFAULT_FROM_EMAIL")
+SERVER_EMAIL=env("SERVER_EMAIL")
+
+ANYMAIL = {
+    "MAILGUN_API_KEY": os.environ.get("MAILGUN_API_KEY"),
+    "MAILGUN_SENDER_DOMAIN": os.environ.get("MAILGUN_SENDER_DOMAIN"),
+}
+
+MESSAGE_TAGS = {
+    messages.ERROR: 'danger',
+}
+
+GRAPH_MODELS ={
+    'all_applications': True,
+    'graph_models': True,
+}
+
+LOGIN_URL = "userauths:sign-in"
+LOGIN_REDIRECT_URL = ""
+LOGOUT_REDIRECT_URL = "userauths:sign-in"
+
+RECAPTCHA_PUBLIC_KEY = env("DJANGO_RECAPTCHA_PUBLIC_KEY")
+RECAPTCHA_PRIVATE_KEY = env("DJANGO_RECAPTCHA_PRIVATE_KEY")
 
 AUTH_USER_MODEL = 'userauths.User'
 
