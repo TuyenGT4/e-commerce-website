@@ -571,18 +571,6 @@ def vietqr_confirm(request, order_id):
     }
     return render(request, "store/vietqr_confirm.html", context)
 
-
-def payment_status(request, order_id):
-    """Trang hiển thị trạng thái thanh toán"""
-    order = store_models.Order.objects.get(order_id=order_id)
-    payment_status = request.GET.get("payment_status")
-
-    context = {
-        "order": order,
-        "payment_status": payment_status,
-    }
-    return render(request, "store/payment_status.html", context)
-
 def payment_status(request, order_id):
     order = store_models.Order.objects.get(order_id=order_id)
     payment_status = request.GET.get("payment_status")

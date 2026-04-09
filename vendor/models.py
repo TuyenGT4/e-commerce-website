@@ -3,11 +3,6 @@ from shortuuid.django_fields import ShortUUIDField
 from userauths.models import User
 from django.utils.text import slugify
 
-NOTIFICATION_TYPE = (
-    ("New Order", "Đơn hàng mới"),
-    ("New Review", "Đánh giá mới"),
-)
-
 PAYOUT_METHOD = (
     ("Chuyển khoản ngân hàng", "Chuyển khoản ngân hàng"),
     ("VNPay", "VNPay"),
@@ -16,6 +11,7 @@ PAYOUT_METHOD = (
 
 TYPE = (
     ("New Order", "Đơn hàng mới"),
+    ("New Review", "Đánh giá mới"),
     ("Item Shipped", "Hàng đang giao"),
     ("Item Delivered", "Đã giao hàng"),
 )

@@ -286,3 +286,55 @@ def change_password(request):
             return redirect("customer:change_password")
 
     return render(request, "customer/change_password.html")
+
+# Thêm vào cuối customer/views.py
+
+@login_required
+def create_review(request, order_id, item_id):
+    """Khách hàng gửi đánh giá sản phẩm từ trang chi tiết đơn hàng"""
+    order = store_models.Order.objects.get(
+        customer=request.user,
+        order_id=order_id
+    )
+    item = store_models.OrderItem.objects.get(
+        order=order,
+        item_id=item_id
+    )
+    product = item.product
+
+    if request.method == "POST":
+        rating = request.POST.get("rating")
+        review_text = request.POST.get("review")
+
+        # Kiểm tra đã đánh giá sản phẩm này chưa
+        existing_review = store_models.Review.objects.filter(
+            user=request.user,
+            product=product
+        ).first()
+
+        if existing_review:
+            # Cập nhật đánh giá cũ
+            existing_review.rating = rating
+            existing_review.review = review_text
+            existing_review.active = False  # Chờ admin duyệt lại
+            existing_review.save()
+            messages.success(request, "Đã cập nhật đánh giá, đang chờ duyệt")
+        else:
+            # Tạo đánh giá mới
+            store_models.Review.objects.create(
+                user=request.user,
+                product=product,
+                rating=rating,
+                review=review_text,
+                active=False  # Chờ admin duyệt
+            )
+            messages.success(request, "Đánh giá đã được gửi, đang chờ duyệt")
+
+        # Gửi thông báo cho vendor
+        from vendor import models as vendor_models
+        vendor_models.Notifications.objects.create(
+            type="New Review",
+            user=product.vendor,
+        )
+
+    return redirect("customer:order_item_detail", order_id=order.order_id, item_id=item.item_id)
