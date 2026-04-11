@@ -1,367 +1,162 @@
-{% extends 'partials/base.html' %} {% load static %} {% load humanize %} {%
-block content %}
+
+{% extends 'partials/base.html' %} {% load static %} {% load humanize %} {% block content %}
+
 
 <div class="gray py-3">
-  <div class="container">
-    <div class="row">
-      <div class="colxl-12 col-lg-12 col-md-12">
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/">Home</a></li>
-            <li class="breadcrumb-item"><a href="#">Customer</a></li>
-            <li class="breadcrumb-item active" aria-current="page">
-              Order #334564
-            </li>
-          </ol>
-        </nav>
-      </div>
+    <div class="container">
+        <div class="row">
+            <div class="colxl-12 col-lg-12 col-md-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        <li class="breadcrumb-item"><a href="#">Customer</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Order #334564</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
 <section class="middle">
-  <div class="container">
-    <div class="row align-items-start justify-content-between">
-      {% include 'customer/sidebar.html' %}
+    <div class="container">
+        <div class="row align-items-start justify-content-between">
+            {% include 'customer/sidebar.html' %}
 
-      <div class="col-12 col-md-12 col-lg-8 col-xl-8">
-        <div class="row mb-4">
-          <h4 class="mb-0 mb-2 fw-bold">Order Number: #{{order.order_id}}</h4>
-          <div class="">
-            <a
-              href="{% url 'customer:order_detail' order.order_id %}"
-              class="btn bg-light btn-sm rounded"
-              ><i class="fas fa-arrow-left me-1"></i> Go Back</a
-            >
-          </div>
-        </div>
 
-        <div class="order-data">
-          <div class="ord_list_wrap border mb-4 mfliud">
-            <div class="ord_list_body text-left">
-              <div
-                class="row align-items-center justify-content-center m-0 py-4 br-bottom"
-              >
-                <div class="col-xl-6 col-lg-5 col-md-5 col-12">
-                  <div
-                    class="cart_single d-flex align-items-start mfliud-bot gap-3"
-                  >
-                    <div class="cart_selected_single_thumb">
-                      <a
-                        href="{% url 'store:product_detail' item.product.slug %}"
-                        ><img
-                          src="{{item.product.image.url}}"
-                          width="75"
-                          class="img-fluid rounded"
-                          alt=""
-                      /></a>
+            <div class="col-12 col-md-12 col-lg-8 col-xl-8">
+                <div class="row mb-4">
+                    <h4 class="mb-0 mb-2 fw-bold">Order Number: #{{order.order_id}}</h4>
+                     <div class="">
+                        <a href="{% url 'customer:order_detail' order.order_id %}" class="btn bg-light btn-sm rounded"><i class="fas fa-arrow-left me-1"></i> Go Back</a>
                     </div>
-                    <div class="cart_single_caption pl-3">
-                      <h4 class="product_title fs-sm ft-medium mb-1 lh-1">
-                        <a
-                          href="{% url 'store:product_detail' item.product.slug %}"
-                          >{{item.product.name}}</a
-                        >
-                      </h4>
-                      <p class="mb-2">
-                        <span class="text-dark medium"
-                          >Vendor:
-                          {{item.product.vendor.profile.full_name}}</span
-                        >
-                        <br />
+                </div>
 
-                        {% if item.color %}
-                        <span class="text-dark medium"
-                          >Color: {{item.color}}</span
-                        >
-                        {% endif %} {% if item.size %}
-                        <span class="text-dark medium"
-                          >Size: {{item.size}}</span
-                        >
+                <div class="order-data">
+                    <div class="ord_list_wrap border mb-4 mfliud">
+                        <div class="ord_list_body text-left">
+                            <div class="row align-items-center justify-content-center m-0 py-4 br-bottom">
+                                <div class="col-xl-6 col-lg-5 col-md-5 col-12">
+                                    <div class="cart_single d-flex align-items-start mfliud-bot gap-3">
+                                        <div class="cart_selected_single_thumb">
+                                            <a href="{% url 'store:product_detail' item.product.slug %}"><img src="{{item.product.image.url}}" width="75" class="img-fluid rounded" alt="" /></a>
+                                        </div>
+                                        <div class="cart_single_caption pl-3">
+                                            <h4 class="product_title fs-sm ft-medium mb-1 lh-1"> <a href="{% url 'store:product_detail' item.product.slug %}">{{item.product.name}}</a></h4>
+                                            <p class="mb-2">
+                                                <span class="text-dark medium">Vendor: {{item.product.vendor.profile.full_name}}</span> <br />
+                                                
+                                                {% if item.color %}
+                                                    <span class="text-dark medium">Color: {{item.color}}</span>
+                                                {% endif %}
+
+                                                {% if item.size %}
+                                                    <span class="text-dark medium">Size: {{item.size}}</span>
+                                                {% endif %}
+                                                    
+                                            </p>
+                                            <h4 class="fs-sm ft-bold mb-0 lh-1">${{item.price}}</h4>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-xl-2 col-lg-3 col-md-3 col-6">
+                                    <p class="mb-1 p-0"><span class="text-muted">Status</span></p>
+                                    <div class="delv_status"><span class="ft-medium small text-warning bg-light-warning rounded px-3 py-1">{{item.order_status}}</span></div>
+                                </div>
+                                <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                    <p class="mb-1 p-0"><span class="text-muted">Payment Status</span></p>
+                                    <h6 class="mb-0 ft-medium fs-sm">{{order.payment_status}}</h6>
+                                </div>
+                                <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                    <p class="mb-1 p-0"><span class="text-muted">Order Date/Time</span></p>
+                                    <h6 class="mb-0 ft-medium fs-sm">{{order.date}}</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mt-5 mb-3 fw-bold">Track Order</h4>
+                    <div class="">
+                        <h5 class="mb-2 fs-sm">
+                            <span class="fw-bold">Tracking ID: </span> 
+                            {{item.tracking_id|default:"Not added yet"}} 
+                            <a href="javascript:void(0)" class="copy-link"><i class="fas fa-copy ms-1 text-primary fs-5"></i></a>
+                        </h5>
+                        <h5 class="mb-2 fs-sm">
+                            <span class="fw-bold">Shipping Service: </span> 
+                            {{item.shipping_service|default:"Not added yet"}}
+                        </h5>
+                        <input type="text" value="{{item.tracking_id}}" hidden id="tracking-id">
+
+
+                        {% if item.shipping_service == "DHL" %}
+                            <a target="_blank" href="https://www.dhl.com/global-en/home/tracking.html?tracking-id={{item.tracking_id}}" class="btn bg-primary text-light btn-sm rounded mt-2"> Track Order <i class="fas fa-truck ms-1"></i></a>
                         {% endif %}
-                      </p>
-                      <h4 class="fs-sm ft-bold mb-0 lh-1">${{item.price}}</h4>
+
+                        {% if item.shipping_service == "FedX" %}
+                            <a target="_blank" href="https://www.fedex.com/fedextrack/?tracknumbers={{item.tracking_id}}" class="btn bg-primary text-light btn-sm rounded mt-2"> Track Order <i class="fas fa-truck ms-1"></i></a>
+                        {% endif %}
+
+                        {% if item.shipping_service == "UPS" %}
+                            <a target="_blank" href="https://www.ups.com/track?tracknum={{item.tracking_id}}" class="btn bg-primary text-light btn-sm rounded mt-2"> Track Order <i class="fas fa-truck ms-1"></i></a>
+                        {% endif %}
+
+                        {% if item.shipping_service == "GIG Logistics" %}
+                            <a target="_blank" href="https://giglogistics.com/track/{{item.tracking_id}}" class="btn bg-primary text-light btn-sm rounded mt-2"> Track Order <i class="fas fa-truck ms-1"></i></a>
+                        {% endif %}
+                            
                     </div>
-                  </div>
                 </div>
-                <div class="col-xl-2 col-lg-3 col-md-3 col-6">
-                  <p class="mb-1 p-0"><span class="text-muted">Status</span></p>
-                  <div class="delv_status">
-                    <span
-                      class="ft-medium small text-warning bg-light-warning rounded px-3 py-1"
-                      >{{item.order_status}}</span
-                    >
-                  </div>
-                </div>
-                <div class="col-xl-2 col-lg-4 col-md-4 col-6">
-                  <p class="mb-1 p-0">
-                    <span class="text-muted">Payment Status</span>
-                  </p>
-                  <h6 class="mb-0 ft-medium fs-sm">{{order.payment_status}}</h6>
-                </div>
-                <div class="col-xl-2 col-lg-4 col-md-4 col-6">
-                  <p class="mb-1 p-0">
-                    <span class="text-muted">Order Date/Time</span>
-                  </p>
-                  <h6 class="mb-0 ft-medium fs-sm">{{order.date}}</h6>
-                </div>
-              </div>
             </div>
-          </div>
-
-          <h4 class="mt-5 mb-3 fw-bold">Track Order</h4>
-          <div class="">
-            <h5 class="mb-2 fs-sm">
-              <span class="fw-bold">Tracking ID: </span>
-              {{item.tracking_id|default:"Not added yet"}}
-              <a href="javascript:void(0)" class="copy-link"
-                ><i class="fas fa-copy ms-1 text-primary fs-5"></i
-              ></a>
-            </h5>
-            <h5 class="mb-2 fs-sm">
-              <span class="fw-bold">Shipping Service: </span>
-              {{item.shipping_service|default:"Not added yet"}}
-            </h5>
-            <input
-              type="text"
-              value="{{item.tracking_id}}"
-              hidden
-              id="tracking-id"
-            />
-
-            {% if item.shipping_service == "DHL" %}
-            <a
-              target="_blank"
-              href="https://www.dhl.com/global-en/home/tracking.html?tracking-id={{item.tracking_id}}"
-              class="btn bg-primary text-light btn-sm rounded mt-2"
-            >
-              Track Order <i class="fas fa-truck ms-1"></i
-            ></a>
-            {% endif %} {% if item.shipping_service == "FedX" %}
-            <a
-              target="_blank"
-              href="https://www.fedex.com/fedextrack/?tracknumbers={{item.tracking_id}}"
-              class="btn bg-primary text-light btn-sm rounded mt-2"
-            >
-              Track Order <i class="fas fa-truck ms-1"></i
-            ></a>
-            {% endif %} {% if item.shipping_service == "UPS" %}
-            <a
-              target="_blank"
-              href="https://www.ups.com/track?tracknum={{item.tracking_id}}"
-              class="btn bg-primary text-light btn-sm rounded mt-2"
-            >
-              Track Order <i class="fas fa-truck ms-1"></i
-            ></a>
-            {% endif %} {% if item.shipping_service == "GIG Logistics" %}
-            <a
-              target="_blank"
-              href="https://giglogistics.com/track/{{item.tracking_id}}"
-              class="btn bg-primary text-light btn-sm rounded mt-2"
-            >
-              Track Order <i class="fas fa-truck ms-1"></i
-            ></a>
-            {% endif %}
-          </div>
-
-          <!-- ==========================================
-                         PHẦN ĐÁNH GIÁ SẢN PHẨM
-                         Chỉ hiện khi đơn hàng đã được giao (Fulfilled)
-                    =========================================== -->
-          {% if item.order_status == "Fulfilled" %}
-          <div class="border rounded p-4 mt-5">
-            <h4 class="mb-4 fw-bold">
-              <i class="fas fa-star text-warning me-2"></i>Đánh giá sản phẩm
-            </h4>
-
-            {% if existing_review %}
-            <!-- Hiển thị đánh giá cũ nếu đã đánh giá -->
-            <div
-              class="alert alert-success d-flex align-items-center mb-3"
-              role="alert"
-            >
-              <i class="fas fa-check-circle me-2"></i>
-              Bạn đã đánh giá sản phẩm này. {% if not existing_review.active %}
-              <span class="ms-1 text-muted">(Đang chờ duyệt)</span>
-              {% endif %}
-            </div>
-            <div class="mb-3">
-              <span class="text-warning fs-5">
-                {% for i in "12345" %} {% if forloop.counter <=
-                existing_review.rating %}
-                <i class="fas fa-star"></i>
-                {% else %}
-                <i class="far fa-star"></i>
-                {% endif %} {% endfor %}
-              </span>
-              <p class="mt-2 text-muted">{{ existing_review.review }}</p>
-            </div>
-            <p class="text-muted small mb-3">
-              Bạn có thể cập nhật đánh giá bên dưới:
-            </p>
-            {% endif %}
-
-            <!-- Form gửi / cập nhật đánh giá -->
-            <form
-              method="POST"
-              action="{% url 'customer:create_review' order.order_id item.item_id %}"
-            >
-              {% csrf_token %}
-
-              <!-- Chọn số sao -->
-              <div class="mb-3">
-                <label class="form-label fw-semibold"
-                  >Số sao <span class="text-danger">*</span></label
-                >
-                <div class="star-rating d-flex gap-2 fs-4" id="star-rating">
-                  {% for i in "12345" %}
-                  <i
-                    class="{% if existing_review and forloop.counter <= existing_review.rating %}fas{% else %}far{% endif %} fa-star star-icon text-warning"
-                    style="cursor: pointer"
-                    data-value="{{ forloop.counter }}"
-                  >
-                  </i>
-                  {% endfor %}
-                </div>
-                <input
-                  type="hidden"
-                  name="rating"
-                  id="rating-input"
-                  value="{% if existing_review %}{{ existing_review.rating }}{% endif %}"
-                  required
-                />
-                <div class="invalid-feedback">Vui lòng chọn số sao</div>
-              </div>
-
-              <!-- Nhận xét -->
-              <div class="mb-3">
-                <label class="form-label fw-semibold"
-                  >Nhận xét <span class="text-danger">*</span></label
-                >
-                <textarea
-                  name="review"
-                  class="form-control"
-                  rows="4"
-                  placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
-                  required
-                >
-{% if existing_review %}{{ existing_review.review }}{% endif %}</textarea
-                >
-              </div>
-
-              <button type="submit" class="btn btn-primary px-4">
-                <i class="fas fa-paper-plane me-2"></i>
-                {% if existing_review %}Cập nhật đánh giá{% else %}Gửi đánh
-                giá{% endif %}
-              </button>
-            </form>
-          </div>
-          {% else %}
-          <!-- Thông báo khi đơn hàng chưa được giao -->
-          <div class="border rounded p-4 mt-5 bg-light">
-            <h4 class="mb-2 fw-bold text-muted">
-              <i class="fas fa-star me-2"></i>Đánh giá sản phẩm
-            </h4>
-            <p class="text-muted mb-0">
-              <i class="fas fa-info-circle me-1"></i>
-              Bạn có thể đánh giá sản phẩm sau khi đơn hàng được giao thành
-              công.
-            </p>
-          </div>
-          {% endif %}
-          <!-- ==========================================
-                         KẾT THÚC PHẦN ĐÁNH GIÁ
-                    =========================================== -->
         </div>
-      </div>
     </div>
-  </div>
 </section>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 
 <script>
-  $(document).ready(function () {
-    const Toast = Swal.mixin({
-      toast: true,
-      position: "top",
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
-      didOpen: (toast) => {
-        toast.onmouseenter = Swal.stopTimer;
-        toast.onmouseleave = Swal.resumeTimer;
-      },
+    
+
+    $(document).ready(function(){
+        const Toast = Swal.mixin({
+            toast: true,
+            position: "top",
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.onmouseenter = Swal.stopTimer;
+                toast.onmouseleave = Swal.resumeTimer;
+            },
+        });
+
+        $('.copy-link').click(function(e) {
+            e.preventDefault();
+
+            // Get the value of the hidden input
+            var trackingId = $('#tracking-id').val();
+            
+            // Create a temporary input to hold the value
+            var $tempInput = $('<input>');
+            $('body').append($tempInput);
+            $tempInput.val(trackingId).select();
+
+            // Copy the value to the clipboard
+            document.execCommand('copy');
+
+            // Remove the temporary input
+            $tempInput.remove();
+
+            $(".copy-link").html('<i class="fas fa-check-circle ms-1 text-success fs-5"></i>')
+            setTimeout(() => {
+                $(".copy-link").html('<i class="fas fa-copy ms-1 text-success fs-5"></i>')
+            }, 3000);
+            Toast.fire({
+                icon: "success",
+                title: "Tracking ID Copied!",
+            });
+        });
     });
-
-    // ==========================================
-    // Copy tracking ID
-    // ==========================================
-    $(".copy-link").click(function (e) {
-      e.preventDefault();
-      var trackingId = $("#tracking-id").val();
-      var $tempInput = $("<input>");
-      $("body").append($tempInput);
-      $tempInput.val(trackingId).select();
-      document.execCommand("copy");
-      $tempInput.remove();
-
-      $(".copy-link").html(
-        '<i class="fas fa-check-circle ms-1 text-success fs-5"></i>',
-      );
-      setTimeout(() => {
-        $(".copy-link").html(
-          '<i class="fas fa-copy ms-1 text-success fs-5"></i>',
-        );
-      }, 3000);
-      Toast.fire({
-        icon: "success",
-        title: "Tracking ID Copied!",
-      });
-    });
-
-    // ==========================================
-    // Xử lý chọn sao (click để chọn, hover để xem trước)
-    // ==========================================
-    const stars = $(".star-icon");
-
-    // Hover: tô sáng sao
-    stars.on("mouseover", function () {
-      const val = $(this).data("value");
-      stars.each(function () {
-        if ($(this).data("value") <= val) {
-          $(this).removeClass("far").addClass("fas");
-        } else {
-          $(this).removeClass("fas").addClass("far");
-        }
-      });
-    });
-
-    // Mouse leave: trở về trạng thái đã chọn
-    $("#star-rating").on("mouseleave", function () {
-      const selected = parseInt($("#rating-input").val()) || 0;
-      stars.each(function () {
-        if ($(this).data("value") <= selected) {
-          $(this).removeClass("far").addClass("fas");
-        } else {
-          $(this).removeClass("fas").addClass("far");
-        }
-      });
-    });
-
-    // Click: lưu giá trị vào input hidden
-    stars.on("click", function () {
-      const val = $(this).data("value");
-      $("#rating-input").val(val);
-      stars.each(function () {
-        if ($(this).data("value") <= val) {
-          $(this).removeClass("far").addClass("fas");
-        } else {
-          $(this).removeClass("fas").addClass("far");
-        }
-      });
-    });
-  });
 </script>
 
 {% endblock content %}
