@@ -9,21 +9,22 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives, send_mail
 
 from decimal import Decimal
-import hashlib
-import hmac
-import urllib.parse
-from datetime import datetime
-
 import requests
-
+import stripe
 from plugin.service_fee import calculate_service_fee
-from plugin.paginate_queryset import paginate_queryset
-from plugin.tax_calculation import tax_calculation
+import razorpay
 
+from plugin.paginate_queryset import paginate_queryset
 from store import models as store_models
 from customer import models as customer_models
 from vendor import models as vendor_models
 from userauths import models as userauths_models
+from plugin.tax_calculation import tax_calculation
+from plugin.exchange_rate import convert_usd_to_inr, convert_usd_to_kobo, convert_usd_to_ngn, get_usd_to_ngn_rate
+
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 
 def clear_cart_items(request):
     try:
@@ -32,42 +33,6 @@ def clear_cart_items(request):
     except:
         pass
     return
-
-def send_order_email(order):
-    """Gửi email xác nhận đơn hàng cho khách hàng và nhà bán hàng"""
-    # Email cho khách hàng
-    customer_merge_data = {
-        'order': order,
-        'order_items': order.order_items(),
-    }
-    subject = "Đơn hàng mới!"
-    text_body = render_to_string("email/order/customer/customer_new_order.txt", customer_merge_data)
-    html_body = render_to_string("email/order/customer/customer_new_order.html", customer_merge_data)
-
-    msg = EmailMultiAlternatives(
-        subject=subject,
-        from_email=settings.FROM_EMAIL,
-        to=[order.address.email],
-        body=text_body
-    )
-    msg.attach_alternative(html_body, "text/html")
-    msg.send()
-
-    # Email cho từng nhà bán hàng
-    for item in order.order_items():
-        vendor_merge_data = {'item': item}
-        subject = "Đơn hàng mới!"
-        text_body = render_to_string("email/order/vendor/vendor_new_order.txt", vendor_merge_data)
-        html_body = render_to_string("email/order/vendor/vendor_new_order.html", vendor_merge_data)
-
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            from_email=settings.FROM_EMAIL,
-            to=[item.vendor.email],
-            body=text_body
-        )
-        msg.attach_alternative(html_body, "text/html")
-        msg.send()
 
 def index(request):
     products = store_models.Product.objects.filter(status="Published")
@@ -102,8 +67,8 @@ def shop(request):
     ]
 
     prices = [
-        {"id": "lowest", "value": "Giá cao đến thấp"},
-        {"id": "highest", "value": "Giá thấp đến cao"},
+        {"id": "lowest", "value": "Highest to Lowest"},
+        {"id": "highest", "value": "Lowest to Highest"},
     ]
 
 
@@ -173,20 +138,20 @@ def add_to_cart(request):
 
     # Validate required fields
     if not id or not qty or not cart_id:
-        return JsonResponse({"error": "Vui lòng chọn màu sắc hoặc kích cỡ"}, status=400)
+        return JsonResponse({"error": "No color or size selected"}, status=400)
 
     # Try to fetch the product, return an error if it doesn't exist
     try:
         product = store_models.Product.objects.get(status="Published", id=id)
     except store_models.Product.DoesNotExist:
-        return JsonResponse({"error": "Không tìm thấy sản phẩm"}, status=404)
+        return JsonResponse({"error": "Product not found"}, status=404)
 
     # Check if the item is already in the cart
     existing_cart_item = store_models.Cart.objects.filter(cart_id=cart_id, product=product).first()
 
     # Check if quantity that user is adding exceed item stock qty
     if int(qty) > product.stock:
-        return JsonResponse({"error": "Số lượng vượt quá tồn kho hiện tại"}, status=404)
+        return JsonResponse({"error": "Qty exceed current stock amount"}, status=404)
 
     # If the item is not in the cart, create a new cart entry
     if not existing_cart_item:
@@ -246,7 +211,7 @@ def cart(request):
         addresses = None
 
     if not items:
-        messages.warning(request, "Giỏ hàng của bạn đang trống")
+        messages.warning(request, "No item in cart")
         return redirect("store:index")
 
     context = {
@@ -263,12 +228,12 @@ def delete_cart_item(request):
     
     # Validate required fields
     if not id and not item_id and not cart_id:
-        return JsonResponse({"error": "Không tìm thấy sản phẩm"}, status=400)
+        return JsonResponse({"error": "Item or Product id not found"}, status=400)
 
     try:
         product = store_models.Product.objects.get(status="Published", id=id)
     except store_models.Product.DoesNotExist:
-        return JsonResponse({"error": "Không tìm thấy sản phẩm"}, status=404)
+        return JsonResponse({"error": "Product not found"}, status=404)
 
     # Check if the item is already in the cart
     item = store_models.Cart.objects.get(product=product, id=item_id)
@@ -279,7 +244,7 @@ def delete_cart_item(request):
     cart_sub_total = store_models.Cart.objects.filter(cart_id=cart_id).aggregate(sub_total = models.Sum("sub_total"))['sub_total']
 
     return JsonResponse({
-        "message": "Đã xóa sản phẩm khỏi giỏ hàng",
+        "message": "Item deleted",
         "total_cart_items": total_cart_items.count(),
         "cart_sub_total": "{:,.2f}".format(cart_sub_total) if cart_sub_total else 0.00
     })
@@ -288,7 +253,7 @@ def create_order(request):
     if request.method == "POST":
         address_id = request.POST.get("address")
         if not address_id:
-            messages.warning(request, "Vui lòng chọn địa chỉ giao hàng để tiếp tục")
+            messages.warning(request, "Please select an address to continue")
             return redirect("store:cart")
         
         address = customer_models.Address.objects.filter(user=request.user, id=address_id).first()
@@ -307,11 +272,10 @@ def create_order(request):
         order.customer = request.user
         order.address = address
         order.shipping = cart_shipping_total
-        order.tax = tax_calculation(cart_sub_total)
+        order.tax = tax_calculation(address.country, cart_sub_total)
         order.total = order.sub_total + order.shipping + Decimal(order.tax)
         order.service_fee = calculate_service_fee(order.total)
         order.total += order.service_fee
-        order.initial_total = order.total
         order.save()
 
         for i in items:
@@ -324,7 +288,7 @@ def create_order(request):
                 price=i.price,
                 sub_total=i.sub_total,
                 shipping=i.shipping,
-                tax=tax_calculation(i.sub_total),
+                tax=tax_calculation(address.country, i.sub_total),
                 total=i.total,
                 initial_total=i.total,
                 vendor=i.product.vendor
@@ -342,24 +306,24 @@ def coupon_apply(request, order_id):
         order = store_models.Order.objects.get(order_id=order_id)
         order_items = store_models.OrderItem.objects.filter(order=order)
     except store_models.Order.DoesNotExist:
-        messages.error(request, "Không tìm thấy đơn hàng")
+        messages.error(request, "Order not found")
         return redirect("store:cart")
 
     if request.method == 'POST':
         coupon_code = request.POST.get("coupon_code")
         
         if not coupon_code:
-            messages.error(request, "Vui lòng nhập mã giảm giá")
+            messages.error(request, "No coupon entered")
             return redirect("store:checkout", order.order_id)
             
         try:
             coupon = store_models.Coupon.objects.get(code=coupon_code)
         except store_models.Coupon.DoesNotExist:
-            messages.error(request, "Mã giảm giá không tồn tại")
+            messages.error(request, "Coupon does not exist")
             return redirect("store:checkout", order.order_id)
         
         if coupon in order.coupons.all():
-            messages.warning(request, "Mã giảm giá này đã được áp dụng")
+            messages.warning(request, "Coupon already activated")
             return redirect("store:checkout", order.order_id)
         else:
             # Assuming coupon applies to specific vendor items, not globally
@@ -372,7 +336,6 @@ def coupon_apply(request, order_id):
                     item.coupon.add(coupon) 
                     item.total -= item_discount
                     item.saved += item_discount
-                    item.applied_coupon = True
                     item.save()
 
             # Apply total discount to the order after processing all items
@@ -383,193 +346,255 @@ def coupon_apply(request, order_id):
                 order.saved += total_discount
                 order.save()
         
-        messages.success(request, "Áp dụng mã giảm giá thành công")
+        messages.success(request, "Coupon Activated")
         return redirect("store:checkout", order.order_id)
 
 def checkout(request, order_id):
-    """Trang thanh toán — hiển thị thông tin đơn hàng và các phương thức thanh toán"""
     order = store_models.Order.objects.get(order_id=order_id)
-
-    # Tạo URL QR Code VietQR
-    vietqr_url = (
-        f"https://img.vietqr.io/image/{settings.VIETQR_BANK_ID}"
-        f"-{settings.VIETQR_ACCOUNT_NO}-compact2.png"
-        f"?amount={int(order.total)}"
-        f"&addInfo=DH{order.order_id}"
-        f"&accountName={settings.VIETQR_ACCOUNT_NAME}"
-    )
-
-    context = {
-        "order": order,
-        "vietqr_url": vietqr_url,
-        "vnpay_tmn_code": settings.VNPAY_TMN_CODE,
-        "vietqr_bank_id": settings.VIETQR_BANK_ID,
-        "vietqr_account_no": settings.VIETQR_ACCOUNT_NO,
-        "vietqr_account_name": settings.VIETQR_ACCOUNT_NAME,
-    }
-    return render(request, "store/checkout.html", context)
-
-def cod_payment(request, order_id):
-    """Thanh toán khi nhận hàng (COD)"""
-    order = store_models.Order.objects.get(order_id=order_id)
-
-    if order.payment_status == "Processing":
-        # COD: vẫn giữ trạng thái Processing vì chưa nhận được tiền mặt
-        order.payment_method = "COD"
-        order.save()
-
-        clear_cart_items(request)
-
-        # Tạo thông báo cho khách hàng
-        customer_models.Notifications.objects.create(
-            type="New Order",
-            user=request.user
-        )
-
-        # Tạo thông báo cho nhà bán hàng
-        for item in order.order_items():
-            vendor_models.Notifications.objects.create(
-                type="New Order",
-                user=item.vendor
-            )
-
-        # Gửi email xác nhận
-        try:
-            send_order_email(order)
-        except Exception as e:
-            print(f"Lỗi gửi email: {e}")
-
-        return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
-
-    return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
-
-
-def vnpay_payment(request, order_id):
-    """Tạo URL thanh toán VNPay và redirect"""
-    order = store_models.Order.objects.get(order_id=order_id)
-
-    # Tạo các tham số VNPay theo tài liệu API
-    vnp_params = {
-        'vnp_Version': '2.1.0',
-        'vnp_Command': 'pay',
-        'vnp_TmnCode': settings.VNPAY_TMN_CODE,
-        'vnp_Amount': int(order.total) * 100,  # VNPay tính theo đơn vị nhỏ nhất (x100)
-        'vnp_CurrCode': 'VND',
-        'vnp_TxnRef': str(order.order_id),
-        'vnp_OrderInfo': f'Thanh toan don hang {order.order_id}',
-        'vnp_OrderType': 'other',
-        'vnp_Locale': 'vn',
-        'vnp_ReturnUrl': settings.VNPAY_RETURN_URL,
-        'vnp_IpAddr': request.META.get('REMOTE_ADDR', '127.0.0.1'),
-        'vnp_CreateDate': datetime.now().strftime('%Y%m%d%H%M%S'),
-    }
-
-    # Sắp xếp tham số theo thứ tự alphabet
-    sorted_params = sorted(vnp_params.items())
-    query_string = urllib.parse.urlencode(sorted_params)
-
-    # Tạo chữ ký HMAC-SHA512
-    hmac_hash = hmac.new(
-        settings.VNPAY_HASH_SECRET.encode('utf-8'),
-        query_string.encode('utf-8'),
-        hashlib.sha512
-    )
-    vnp_secure_hash = hmac_hash.hexdigest()
-
-    # Tạo URL thanh toán
-    payment_url = (
-        f"{settings.VNPAY_PAYMENT_URL}"
-        f"?{query_string}"
-        f"&vnp_SecureHash={vnp_secure_hash}"
-    )
-
-    return redirect(payment_url)
-
-
-def vnpay_return(request):
-    """Xử lý callback từ VNPay sau khi thanh toán"""
-    vnp_params = request.GET.dict()
-    vnp_secure_hash = vnp_params.pop('vnp_SecureHash', '')
-    vnp_params.pop('vnp_SecureHashType', '')
-
-    # Sắp xếp và tạo lại chữ ký để xác thực
-    sorted_params = sorted(vnp_params.items())
-    query_string = urllib.parse.urlencode(sorted_params)
-
-    hmac_hash = hmac.new(
-        settings.VNPAY_HASH_SECRET.encode('utf-8'),
-        query_string.encode('utf-8'),
-        hashlib.sha512
-    )
-    expected_hash = hmac_hash.hexdigest()
-
-    # Xác thực chữ ký
-    if expected_hash != vnp_secure_hash:
-        messages.error(request, "Xác thực thanh toán thất bại")
-        return redirect("store:index")
-
-    # Lấy thông tin đơn hàng
-    order_id = vnp_params.get('vnp_TxnRef')
-    vnp_response_code = vnp_params.get('vnp_ResponseCode')
+    
+    amount_in_inr = convert_usd_to_inr(order.total)
+    amount_in_kobo = convert_usd_to_kobo(order.total)
+    amount_in_ngn = convert_usd_to_ngn(order.total)
 
     try:
-        order = store_models.Order.objects.get(order_id=order_id)
-    except store_models.Order.DoesNotExist:
-        messages.error(request, "Không tìm thấy đơn hàng")
-        return redirect("store:index")
+        razorpay_order = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)).order.create({
+            "amount": int(amount_in_inr),
+            "currency": "INR",
+            "payment_capture": "1"
+        })
+    except:
+        razorpay_order = None
+    context = {
+        "order": order,
+        "amount_in_inr":amount_in_inr,
+        "amount_in_kobo":amount_in_kobo,
+        "amount_in_ngn":round(amount_in_ngn, 2),
+        "razorpay_order_id": razorpay_order['id'] if razorpay_order else None,
+        "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
+        "paypal_client_id": settings.PAYPAL_CLIENT_ID,
+        "razorpay_key_id":settings.RAZORPAY_KEY_ID,
+        "paystack_public_key":settings.PAYSTACK_PUBLIC_KEY,
+        "flutterwave_public_key":settings.FLUTTERWAVE_PUBLIC_KEY,
+    }
 
-    # Kiểm tra kết quả thanh toán
-    if vnp_response_code == '00':
+    return render(request, "store/checkout.html", context)
+
+@csrf_exempt
+def stripe_payment(request, order_id):
+    order = store_models.Order.objects.get(order_id=order_id)
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    checkout_session = stripe.checkout.Session.create(
+        customer_email = order.address.email,
+        payment_method_types=['card'],
+        line_items = [
+            {
+                'price_data': {
+                    'currency': 'USD',
+                    'product_data': {
+                        'name': order.address.full_name
+                    },
+                    'unit_amount': int(order.total * 100)
+                },
+                'quantity': 1
+            }
+        ],
+        mode = 'payment',
+        success_url = request.build_absolute_uri(reverse("store:stripe_payment_verify", args=[order.order_id])) + "?session_id={CHECKOUT_SESSION_ID}" + "&payment_method=Stripe",
+        cancel_url = request.build_absolute_uri(reverse("store:stripe_payment_verify", args=[order.order_id]))
+    )
+
+    print("checkkout session", checkout_session)
+    return JsonResponse({"sessionId": checkout_session.id})
+
+def stripe_payment_verify(request, order_id):
+    order = store_models.Order.objects.get(order_id=order_id)
+
+    session_id = request.GET.get("session_id")
+    session = stripe.checkout.Session.retrieve(session_id)
+
+    if session.payment_status == "paid":
         if order.payment_status == "Processing":
             order.payment_status = "Paid"
-            order.payment_method = "VNPay"
-            order.payment_id = vnp_params.get('vnp_TransactionNo', '')
             order.save()
-
             clear_cart_items(request)
+            customer_models.Notifications.objects.create(type="New Order", user=request.user)
+            customer_merge_data = {
+                'order': order,
+                'order_items': order.order_items(),
+            }
+            subject = f"New Order!"
+            text_body = render_to_string("email/order/customer/customer_new_order.txt", customer_merge_data)
+            html_body = render_to_string("email/order/customer/customer_new_order.html", customer_merge_data)
 
-            # Tạo thông báo
-            customer_models.Notifications.objects.create(
-                type="New Order",
-                user=request.user
+            msg = EmailMultiAlternatives(
+                subject=subject, from_email=settings.FROM_EMAIL,
+                to=[order.address.email], body=text_body
             )
-            for item in order.order_items():
-                vendor_models.Notifications.objects.create(
-                    type="New Order",
-                    user=item.vendor
-                )
+            msg.attach_alternative(html_body, "text/html")
+            msg.send()
 
-            # Gửi email xác nhận
-            try:
-                send_order_email(order)
-            except Exception as e:
-                print(f"Lỗi gửi email: {e}")
+            # Send Order Emails to Vendors
+            for item in order.order_items():
+                
+                vendor_merge_data = {
+                    'item': item,
+                }
+                subject = f"New Order!"
+                text_body = render_to_string("email/order/vendor/vendor_new_order.txt", vendor_merge_data)
+                html_body = render_to_string("email/order/vendor/vendor_new_order.html", vendor_merge_data)
+
+                msg = EmailMultiAlternatives(
+                    subject=subject, from_email=settings.FROM_EMAIL,
+                    to=[item.vendor.email], body=text_body
+                )
+                msg.attach_alternative(html_body, "text/html")
+                msg.send()
+
+            return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
+    
+    return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
+    
+def get_paypal_access_token():
+    token_url = 'https://api.sandbox.paypal.com/v1/oauth2/token'
+    data = {'grant_type': 'client_credentials'}
+    auth = (settings.PAYPAL_CLIENT_ID, settings.PAYPAL_SECRET_ID)
+    response = requests.post(token_url, data=data, auth=auth)
+
+    if response.status_code == 200:
+        return response.json()['access_token']
+    else:
+        raise Exception(f'Failed to get access token from PayPal. Status code: {response.status_code}') 
+
+def paypal_payment_verify(request, order_id):
+    order = store_models.Order.objects.get(order_id=order_id)
+
+    transaction_id = request.GET.get("transaction_id")
+    paypal_api_url = f'https://api-m.sandbox.paypal.com/v2/checkout/orders/{transaction_id}'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {get_paypal_access_token()}',
+    }
+    response = requests.get(paypal_api_url, headers=headers)
+
+    if response.status_code == 200:
+        paypal_order_data = response.json()
+        paypal_payment_status = paypal_order_data['status']
+        if paypal_payment_status == 'COMPLETED':
+            if order.payment_status == "Processing":
+                order.payment_status = "Paid"
+                payment_method = request.GET.get("payment_method")
+                order.payment_method = payment_method
+                order.save()
+                clear_cart_items(request)
+                return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
+    else:
+        return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
+
+@csrf_exempt
+def razorpay_payment_verify(request, order_id):
+    order = store_models.Order.objects.get(order_id=order_id)
+    payment_method = request.GET.get("payment_method")
+
+    if request.method == "POST":
+        data = request.POST
+
+        # Extract payment data
+        razorpay_order_id = data.get('razorpay_order_id')
+        razorpay_payment_id = data.get('razorpay_payment_id')
+        razorpay_signature = data.get('razorpay_signature')
+
+        print("razorpay_order_id: ====", razorpay_order_id)
+        print("razorpay_payment_id: ====", razorpay_payment_id)
+        print("razorpay_signature: ====", razorpay_signature)
+
+        params_dict = {
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        }
+
+        # Verify the payment signature
+        razorpay_client.utility.verify_payment_signature({
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        })
+
+        razorpay_client.utility.verify_payment_signature(params_dict)
+
+        # Success response
+        if order.payment_status == "Processing":
+            order.payment_status = "Paid"
+            order.payment_method = payment_method
+            order.save()
+            clear_cart_items(request)
+            customer_models.Notifications.objects.create(type="New Order", user=request.user)
+            for item in order.order_items():
+                vendor_models.Notifications.objects.create(type="New Order", user=item.vendor)
 
             return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
 
+        
+
     return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
 
+def paystack_payment_verify(request, order_id):
+    order = store_models.Order.objects.get(order_id=order_id)
+    reference = request.GET.get('reference', '')
 
-def vietqr_confirm(request, order_id):
-    """Trang xác nhận thanh toán VietQR — hiển thị QR và chờ admin xác nhận"""
+    if reference:
+        headers = {
+            "Authorization": f"Bearer {settings.PAYSTACK_PRIVATE_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        # Verify the transaction
+        response = requests.get(f'https://api.paystack.co/transaction/verify/{reference}', headers=headers)
+        response_data = response.json()
+
+        if response_data['status']:
+            if response_data['data']['status'] == 'success':
+                if order.payment_status == "Processing":
+                    order.payment_status = "Paid"
+                    payment_method = request.GET.get("payment_method")
+                    order.payment_method = payment_method
+                    order.save()
+                    clear_cart_items(request)
+                    return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
+                else:
+                    return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
+            else:
+                # Payment failed
+                return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
+        else:
+            return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
+    else:
+        return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
+
+def flutterwave_payment_callback(request, order_id):
     order = store_models.Order.objects.get(order_id=order_id)
 
-    vietqr_url = (
-        f"https://img.vietqr.io/image/{settings.VIETQR_BANK_ID}"
-        f"-{settings.VIETQR_ACCOUNT_NO}-compact2.png"
-        f"?amount={int(order.total)}"
-        f"&addInfo=DH{order.order_id}"
-        f"&accountName={settings.VIETQR_ACCOUNT_NAME}"
-    )
+    payment_id = request.GET.get('tx_ref')
+    status = request.GET.get('status')
 
-    context = {
-        "order": order,
-        "vietqr_url": vietqr_url,
-        "bank_id": settings.VIETQR_BANK_ID,
-        "account_no": settings.VIETQR_ACCOUNT_NO,
-        "account_name": settings.VIETQR_ACCOUNT_NAME,
+    headers = {
+        'Authorization': f'Bearer {settings.FLUTTERWAVE_PRIVATE_KEY}'
     }
-    return render(request, "store/vietqr_confirm.html", context)
+    response = requests.get(f'https://api.flutterwave.com/v3/charges/verify_by_id/{payment_id}', headers=headers)
+
+    if response.status_code == 200:
+        if order.payment_status == "Processing":
+            order.payment_status = "Paid"
+            payment_method = request.GET.get("payment_method")
+            order.payment_method = payment_method
+            order.save()
+            clear_cart_items(request)
+            return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
+        else:
+            return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
+    else:
+        return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
 
 def payment_status(request, order_id):
     order = store_models.Order.objects.get(order_id=order_id)
