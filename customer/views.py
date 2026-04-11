@@ -11,69 +11,54 @@ from customer import models as customer_models
 
 @login_required
 def dashboard(request):
-    """Trang tổng quan khách hàng"""
     orders = store_models.Order.objects.filter(customer=request.user)
-    total_spent = store_models.Order.objects.filter(
-        customer=request.user
-    ).aggregate(total=models.Sum("total"))['total']
-    notis = customer_models.Notifications.objects.filter(
-        user=request.user,
-        seen=False
-    )
+    total_spent = store_models.Order.objects.filter(customer=request.user).aggregate(total = models.Sum("total"))['total']
+    notis = customer_models.Notifications.objects.filter(user=request.user, seen=False)
 
     context = {
         "orders": orders,
         "total_spent": total_spent,
         "notis": notis,
     }
+
     return render(request, "customer/dashboard.html", context)
 
 @login_required
 def orders(request):
-    """Danh sách đơn hàng của khách hàng"""
     orders = store_models.Order.objects.filter(customer=request.user)
 
     context = {
         "orders": orders,
     }
-    return render(request, "customer/orders.html", context)
 
+    return render(request, "customer/orders.html", context)
 
 @login_required
 def order_detail(request, order_id):
-    """Chi tiết đơn hàng"""
-    order = store_models.Order.objects.get(
-        customer=request.user,
-        order_id=order_id
-    )
+    order = store_models.Order.objects.get(customer=request.user, order_id=order_id)
 
     context = {
         "order": order,
     }
-    return render(request, "customer/order_detail.html", context)
 
+    return render(request, "customer/order_detail.html", context)
 
 @login_required
 def order_item_detail(request, order_id, item_id):
-    """Chi tiết sản phẩm trong đơn hàng"""
-    order = store_models.Order.objects.get(
-        customer=request.user,
-        order_id=order_id
-    )
-    item = store_models.OrderItem.objects.get(
-        order=order,
-        item_id=item_id
-    )
-
+    order = store_models.Order.objects.get(customer=request.user, order_id=order_id)
+    item = store_models.OrderItem.objects.get(order=order, item_id=item_id)
+    
     context = {
         "order": order,
         "item": item,
     }
+
     return render(request, "customer/order_item_detail.html", context)
+
+
 
 @login_required
 def wishlist(request):
-    """Danh sách sản phẩm yêu thích"""
     wishlist_list = customer_models.Wishlist.objects.filter(user=request.user)
     wishlist = paginate_queryset(request, wishlist_list, 6)
 
@@ -81,57 +66,33 @@ def wishlist(request):
         "wishlist": wishlist,
         "wishlist_list": wishlist_list,
     }
-    return render(request, "customer/wishlist.html", context)
 
+    return render(request, "customer/wishlist.html", context)
 
 @login_required
 def remove_from_wishlist(request, id):
-    """Xóa sản phẩm khỏi danh sách yêu thích"""
     wishlist = customer_models.Wishlist.objects.get(user=request.user, id=id)
     wishlist.delete()
-    messages.success(request, "Đã xóa sản phẩm khỏi danh sách yêu thích")
+    
+    messages.success(request, "item removed from wishlist")
     return redirect("customer:wishlist")
 
 
 def add_to_wishlist(request, id):
-    """Thêm sản phẩm vào danh sách yêu thích"""
     if request.user.is_authenticated:
         product = store_models.Product.objects.get(id=id)
-
-        # Kiểm tra sản phẩm đã có trong wishlist chưa
-        if customer_models.Wishlist.objects.filter(
-            user=request.user,
-            product=product
-        ).exists():
-            return JsonResponse({
-                "message": "Sản phẩm đã có trong danh sách yêu thích",
-                "wishlist_count": customer_models.Wishlist.objects.filter(
-                    user=request.user
-                ).count()
-            })
-
-        customer_models.Wishlist.objects.create(
-            product=product,
-            user=request.user
-        )
+        customer_models.Wishlist.objects.create(product=product, user=request.user)
         wishlist = customer_models.Wishlist.objects.filter(user=request.user)
-        return JsonResponse({
-            "message": "Đã thêm sản phẩm vào danh sách yêu thích",
-            "wishlist_count": wishlist.count()
-        })
+        return JsonResponse({"message": "Item added to wishlist", "wishlist_count": wishlist.count()})
     else:
-        return JsonResponse({
-            "message": "Vui lòng đăng nhập để thêm vào danh sách yêu thích",
-            "wishlist_count": "0"
-        })
+        return JsonResponse({"message": "User is not logged in", "wishlist_count": "0"})
+
+
+
 
 @login_required
 def notis(request):
-    """Danh sách thông báo chưa đọc"""
-    notis_list = customer_models.Notifications.objects.filter(
-        user=request.user,
-        seen=False
-    )
+    notis_list = customer_models.Notifications.objects.filter(user=request.user, seen=False)
     notis = paginate_queryset(request, notis_list, 10)
 
     context = {
@@ -140,35 +101,29 @@ def notis(request):
     }
     return render(request, "customer/notis.html", context)
 
-
 @login_required
 def mark_noti_seen(request, id):
-    """Đánh dấu thông báo đã đọc"""
-    noti = customer_models.Notifications.objects.get(
-        user=request.user,
-        id=id
-    )
+    noti = customer_models.Notifications.objects.get(user=request.user, id=id)
     noti.seen = True
     noti.save()
-    messages.success(request, "Đã đánh dấu thông báo là đã đọc")
+
+    messages.success(request, "Notification marked as seen")
     return redirect("customer:notis")
+
 
 @login_required
 def addresses(request):
-    """Danh sách địa chỉ giao hàng"""
     addresses = customer_models.Address.objects.filter(user=request.user)
-
     context = {
         "addresses": addresses,
     }
-    return render(request, "customer/addresses.html", context)
 
+    return render(request, "customer/addresses.html", context)
 
 @login_required
 def address_detail(request, id):
-    """Chi tiết & cập nhật địa chỉ giao hàng"""
     address = customer_models.Address.objects.get(user=request.user, id=id)
-
+    
     if request.method == "POST":
         full_name = request.POST.get("full_name")
         mobile = request.POST.get("mobile")
@@ -189,18 +144,17 @@ def address_detail(request, id):
         address.zip_code = zip_code
         address.save()
 
-        messages.success(request, "Cập nhật địa chỉ thành công")
+        messages.success(request, "Address updated")
         return redirect("customer:address_detail", address.id)
-
+    
     context = {
         "address": address,
     }
-    return render(request, "customer/address_detail.html", context)
 
+    return render(request, "customer/address_detail.html", context)
 
 @login_required
 def address_create(request):
-    """Tạo địa chỉ giao hàng mới"""
     if request.method == "POST":
         full_name = request.POST.get("full_name")
         mobile = request.POST.get("mobile")
@@ -222,31 +176,28 @@ def address_create(request):
             address=address,
             zip_code=zip_code,
         )
-        messages.success(request, "Thêm địa chỉ mới thành công")
-        return redirect("customer:addresses")
 
+        messages.success(request, "Address created")
+        return redirect("customer:addresses")
+    
     return render(request, "customer/address_create.html")
 
-
-@login_required
 def delete_address(request, id):
-    """Xóa địa chỉ giao hàng"""
     address = customer_models.Address.objects.get(user=request.user, id=id)
     address.delete()
-    messages.success(request, "Đã xóa địa chỉ thành công")
+    messages.success(request, "Address deleted")
     return redirect("customer:addresses")
 
 @login_required
 def profile(request):
-    """Trang hồ sơ khách hàng"""
     profile = request.user.profile
 
     if request.method == "POST":
         image = request.FILES.get("image")
         full_name = request.POST.get("full_name")
         mobile = request.POST.get("mobile")
-
-        if image is not None:
+    
+        if image != None:
             profile.image = image
 
         profile.full_name = full_name
@@ -255,86 +206,32 @@ def profile(request):
         request.user.save()
         profile.save()
 
-        messages.success(request, "Cập nhật hồ sơ thành công")
+        messages.success(request, "Profile Updated Successfully")
         return redirect("customer:profile")
-
+    
     context = {
-        'profile': profile,
+        'profile':profile,
     }
     return render(request, "customer/profile.html", context)
 
-
 @login_required
 def change_password(request):
-    """Đổi mật khẩu"""
     if request.method == "POST":
         old_password = request.POST.get("old_password")
         new_password = request.POST.get("new_password")
         confirm_new_password = request.POST.get("confirm_new_password")
 
         if confirm_new_password != new_password:
-            messages.error(request, "Mật khẩu xác nhận không khớp với mật khẩu mới")
+            messages.error(request, "Confirm Password and New Password Does Not Match")
             return redirect("customer:change_password")
-
+        
         if check_password(old_password, request.user.password):
             request.user.set_password(new_password)
             request.user.save()
-            messages.success(request, "Đổi mật khẩu thành công")
+            messages.success(request, "Password Changed Successfully")
             return redirect("customer:profile")
         else:
-            messages.error(request, "Mật khẩu cũ không chính xác")
+            messages.error(request, "Old password is not correct")
             return redirect("customer:change_password")
-
+    
     return render(request, "customer/change_password.html")
-
-# Thêm vào cuối customer/views.py
-
-@login_required
-def create_review(request, order_id, item_id):
-    """Khách hàng gửi đánh giá sản phẩm từ trang chi tiết đơn hàng"""
-    order = store_models.Order.objects.get(
-        customer=request.user,
-        order_id=order_id
-    )
-    item = store_models.OrderItem.objects.get(
-        order=order,
-        item_id=item_id
-    )
-    product = item.product
-
-    if request.method == "POST":
-        rating = request.POST.get("rating")
-        review_text = request.POST.get("review")
-
-        # Kiểm tra đã đánh giá sản phẩm này chưa
-        existing_review = store_models.Review.objects.filter(
-            user=request.user,
-            product=product
-        ).first()
-
-        if existing_review:
-            # Cập nhật đánh giá cũ
-            existing_review.rating = rating
-            existing_review.review = review_text
-            existing_review.active = False  # Chờ admin duyệt lại
-            existing_review.save()
-            messages.success(request, "Đã cập nhật đánh giá, đang chờ duyệt")
-        else:
-            # Tạo đánh giá mới
-            store_models.Review.objects.create(
-                user=request.user,
-                product=product,
-                rating=rating,
-                review=review_text,
-                active=False  # Chờ admin duyệt
-            )
-            messages.success(request, "Đánh giá đã được gửi, đang chờ duyệt")
-
-        # Gửi thông báo cho vendor
-        from vendor import models as vendor_models
-        vendor_models.Notifications.objects.create(
-            type="New Review",
-            user=product.vendor,
-        )
-
-    return redirect("customer:order_item_detail", order_id=order.order_id, item_id=item.item_id)

@@ -19,5 +19,4 @@ urlpatterns = [
     path("delete_address/<id>/", views.delete_address, name="delete_address"),
     path("profile/", views.profile, name="profile"),
     path("change_password/", views.change_password, name="change_password"),
-    path("create_review/<order_id>/<item_id>/", views.create_review, name="create_review"),
 ]
