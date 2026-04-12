@@ -59,33 +59,21 @@ def login_view(request):
 
             if captcha_verified:
                 try:
-                    user_instance = userauths_models.User.objects.get(email=email, is_active=True)
                     user_authenticate = authenticate(request, email=email, password=password)
-
-                    if user_instance is not None:
+                    if user_authenticate is not None:
                         login(request, user_authenticate)
                         messages.success(request, "You are Logged In")
                         next_url = request.GET.get("next", 'store:index')
 
-                        print("next_url ========", next_url)
-                        if next_url == '/undefined/':
+                        if next_url in ['/undefined/', 'undefined', None] or not next_url.startswith('/'):
                             return redirect('store:index')
-                        
-                        if next_url == 'undefined':
-                            return redirect('store:index')
-
-                        if next_url is None or not next_url.startswith('/'):
-                            return redirect('store:index')
-
                         return redirect(next_url)
-
                     else:
-                        messages.error(request, 'Username or password does not exist')
+                        messages.error(request, 'Email or password is incorrect')
                 except userauths_models.User.DoesNotExist:
                     messages.error(request, 'User does not exist')
             else:
                 messages.error(request, 'Captcha verification failed. Please try again.')
-
     else:
         form = userauths_forms.LoginForm()  
 
