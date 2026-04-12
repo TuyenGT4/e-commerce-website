@@ -24,9 +24,6 @@ PAYMENT_STATUS = (
 PAYMENT_METHOD = (
     ("PayPal", "PayPal"),
     ("Stripe", "Stripe"),
-    ("Flutterwave", "Flutterwave"),
-    ("Paystack", "Paystack"),
-    ("RazorPay", "RazorPay"),
 )
 
 ORDER_STATUS = (
