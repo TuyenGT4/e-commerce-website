@@ -21,9 +21,6 @@ urlpatterns = [
     path('stripe_payment/<order_id>/', views.stripe_payment, name='stripe_payment'),
     path('stripe_payment_verify/<order_id>/', views.stripe_payment_verify, name='stripe_payment_verify'),
     path('paypal_payment_verify/<order_id>/', views.paypal_payment_verify, name='paypal_payment_verify'),
-    path('razorpay_payment_verify/<order_id>/', views.razorpay_payment_verify, name='razorpay_payment_verify'),
-    path('paystack_payment_verify/<order_id>/', views.paystack_payment_verify, name='paystack_payment_verify'),
-    path('flutterwave_payment_callback/<order_id>/', views.flutterwave_payment_callback, name='flutterwave_payment_callback'),
 
     path("order_tracker_page/", views.order_tracker_page, name="order_tracker_page"),
     path("order_tracker_detail/<item_id>/", views.order_tracker_detail, name="order_tracker_detail"),
