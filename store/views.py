@@ -12,7 +12,6 @@ from decimal import Decimal
 import requests
 import stripe
 from plugin.service_fee import calculate_service_fee
-import razorpay
 
 from plugin.paginate_queryset import paginate_queryset
 from store import models as store_models
@@ -20,11 +19,9 @@ from customer import models as customer_models
 from vendor import models as vendor_models
 from userauths import models as userauths_models
 from plugin.tax_calculation import tax_calculation
-from plugin.exchange_rate import convert_usd_to_inr, convert_usd_to_kobo, convert_usd_to_ngn, get_usd_to_ngn_rate
 
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
-razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 
 def clear_cart_items(request):
     try:
@@ -352,29 +349,10 @@ def coupon_apply(request, order_id):
 def checkout(request, order_id):
     order = store_models.Order.objects.get(order_id=order_id)
     
-    amount_in_inr = convert_usd_to_inr(order.total)
-    amount_in_kobo = convert_usd_to_kobo(order.total)
-    amount_in_ngn = convert_usd_to_ngn(order.total)
-
-    try:
-        razorpay_order = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)).order.create({
-            "amount": int(amount_in_inr),
-            "currency": "INR",
-            "payment_capture": "1"
-        })
-    except:
-        razorpay_order = None
     context = {
         "order": order,
-        "amount_in_inr":amount_in_inr,
-        "amount_in_kobo":amount_in_kobo,
-        "amount_in_ngn":round(amount_in_ngn, 2),
-        "razorpay_order_id": razorpay_order['id'] if razorpay_order else None,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
         "paypal_client_id": settings.PAYPAL_CLIENT_ID,
-        "razorpay_key_id":settings.RAZORPAY_KEY_ID,
-        "paystack_public_key":settings.PAYSTACK_PUBLIC_KEY,
-        "flutterwave_public_key":settings.FLUTTERWAVE_PUBLIC_KEY,
     }
 
     return render(request, "store/checkout.html", context)
@@ -411,11 +389,14 @@ def stripe_payment_verify(request, order_id):
     order = store_models.Order.objects.get(order_id=order_id)
 
     session_id = request.GET.get("session_id")
+    if not session_id:
+        return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
     session = stripe.checkout.Session.retrieve(session_id)
 
     if session.payment_status == "paid":
         if order.payment_status == "Processing":
             order.payment_status = "Paid"
+            order.payment_method = "Stripe"
             order.save()
             clear_cart_items(request)
             customer_models.Notifications.objects.create(type="New Order", user=request.user)
@@ -470,6 +451,8 @@ def paypal_payment_verify(request, order_id):
     order = store_models.Order.objects.get(order_id=order_id)
 
     transaction_id = request.GET.get("transaction_id")
+    if not transaction_id:
+        return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
     paypal_api_url = f'https://api-m.sandbox.paypal.com/v2/checkout/orders/{transaction_id}'
     headers = {
         'Content-Type': 'application/json',
@@ -487,112 +470,8 @@ def paypal_payment_verify(request, order_id):
                 order.payment_method = payment_method
                 order.save()
                 clear_cart_items(request)
-                return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
-    else:
-        return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
-
-@csrf_exempt
-def razorpay_payment_verify(request, order_id):
-    order = store_models.Order.objects.get(order_id=order_id)
-    payment_method = request.GET.get("payment_method")
-
-    if request.method == "POST":
-        data = request.POST
-
-        # Extract payment data
-        razorpay_order_id = data.get('razorpay_order_id')
-        razorpay_payment_id = data.get('razorpay_payment_id')
-        razorpay_signature = data.get('razorpay_signature')
-
-        print("razorpay_order_id: ====", razorpay_order_id)
-        print("razorpay_payment_id: ====", razorpay_payment_id)
-        print("razorpay_signature: ====", razorpay_signature)
-
-        params_dict = {
-            'razorpay_order_id': razorpay_order_id,
-            'razorpay_payment_id': razorpay_payment_id,
-            'razorpay_signature': razorpay_signature
-        }
-
-        # Verify the payment signature
-        razorpay_client.utility.verify_payment_signature({
-            'razorpay_order_id': razorpay_order_id,
-            'razorpay_payment_id': razorpay_payment_id,
-            'razorpay_signature': razorpay_signature
-        })
-
-        razorpay_client.utility.verify_payment_signature(params_dict)
-
-        # Success response
-        if order.payment_status == "Processing":
-            order.payment_status = "Paid"
-            order.payment_method = payment_method
-            order.save()
-            clear_cart_items(request)
-            customer_models.Notifications.objects.create(type="New Order", user=request.user)
-            for item in order.order_items():
-                vendor_models.Notifications.objects.create(type="New Order", user=item.vendor)
-
             return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
-
-        
-
-    return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
-
-def paystack_payment_verify(request, order_id):
-    order = store_models.Order.objects.get(order_id=order_id)
-    reference = request.GET.get('reference', '')
-
-    if reference:
-        headers = {
-            "Authorization": f"Bearer {settings.PAYSTACK_PRIVATE_KEY}",
-            "Content-Type": "application/json"
-        }
-
-        # Verify the transaction
-        response = requests.get(f'https://api.paystack.co/transaction/verify/{reference}', headers=headers)
-        response_data = response.json()
-
-        if response_data['status']:
-            if response_data['data']['status'] == 'success':
-                if order.payment_status == "Processing":
-                    order.payment_status = "Paid"
-                    payment_method = request.GET.get("payment_method")
-                    order.payment_method = payment_method
-                    order.save()
-                    clear_cart_items(request)
-                    return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
-                else:
-                    return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
-            else:
-                # Payment failed
-                return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
-        else:
-            return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
-    else:
         return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
-
-def flutterwave_payment_callback(request, order_id):
-    order = store_models.Order.objects.get(order_id=order_id)
-
-    payment_id = request.GET.get('tx_ref')
-    status = request.GET.get('status')
-
-    headers = {
-        'Authorization': f'Bearer {settings.FLUTTERWAVE_PRIVATE_KEY}'
-    }
-    response = requests.get(f'https://api.flutterwave.com/v3/charges/verify_by_id/{payment_id}', headers=headers)
-
-    if response.status_code == 200:
-        if order.payment_status == "Processing":
-            order.payment_status = "Paid"
-            payment_method = request.GET.get("payment_method")
-            order.payment_method = payment_method
-            order.save()
-            clear_cart_items(request)
-            return redirect(f"/payment_status/{order.order_id}/?payment_status=paid")
-        else:
-            return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
     else:
         return redirect(f"/payment_status/{order.order_id}/?payment_status=failed")
 

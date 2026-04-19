@@ -1,5 +1,7 @@
 # Hướng Dẫn Chi Tiết Chạy Dự Án Django
 
+Techstack: Bootstrap(FE) + Python_Django(BE) + Postgresql(DB)
+
 ## Bước 1: Cài Đặt Các Phụ Thuộc
 
 Trước khi tiến hành, hãy đảm bảo bạn đã cài Python và `pip` (trình quản lý gói của Python) trên hệ thống. Bạn cũng cần gói tạo môi trường ảo.
