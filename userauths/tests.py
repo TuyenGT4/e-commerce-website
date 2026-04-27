@@ -3,6 +3,33 @@ from django.urls import reverse
 from unittest.mock import patch
 from userauths.models import User, Profile
 
+
+class ProfileModelTestCase(TestCase):
+    def test_profile_without_full_name_uses_user_full_name(self):
+        user = User.objects.create_user(
+            email='profile@example.com',
+            password='StrongPass123!',
+            username='profile',
+            first_name='Nguyen',
+            last_name='Hung',
+        )
+
+        profile = Profile.objects.create(user=user)
+
+        self.assertEqual(profile.full_name, 'Nguyen Hung')
+
+    def test_profile_without_full_name_falls_back_to_username(self):
+        user = User.objects.create_user(
+            email='profile-fallback@example.com',
+            password='StrongPass123!',
+            username='profilefallback',
+        )
+
+        profile = Profile.objects.create(user=user)
+
+        self.assertEqual(profile.full_name, 'profilefallback')
+
+
 class UserRegistrationParetoTestCase(TestCase):
     def setUp(self):
         # Khởi tạo Client (trình duyệt ảo) và cấu hình URL

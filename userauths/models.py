@@ -37,7 +37,7 @@ class Profile(models.Model):
     
     def save(self, *args, **kwargs):
         if self.full_name == "" or self.full_name == None:
-             self.full_name = self.user.full_name
+             self.full_name = self.user.get_full_name() or self.user.username or self.user.email
         super(Profile, self).save(*args, **kwargs)
 
     
